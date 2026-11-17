@@ -1,0 +1,81 @@
+# Throwarm config. Every value marked TUNE is a placeholder: the real numbers come from your arm.
+# Angles are degrees from LeRobot calibration (0 = middle of each joint's calibrated range).
+# Gripper is 0..100 (0 = closed, 100 = open).
+# Record real poses with:  python throwarm.py pose --source follower   (or --source leader)
+
+robot:
+  port: /dev/ttyACM0        # TUNE: `lerobot-find-port` tells you
+  id: my_follower           # must be the same id you used with lerobot-calibrate
+
+leader:                     # only used by `pose --source leader`
+  port: /dev/ttyACM1
+  id: my_leader
+
+safety:
+  # Hard limits. A pose outside these is refused (never clipped silently). TUNE to your setup:
+  # keep a few degrees inside the range where the arm hits the table, the stand or itself.
+  joint_limits:
+    shoulder_pan:  [-60, 60]
+    shoulder_lift: [-100, 100]
+    elbow_flex:    [-100, 100]
+    wrist_flex:    [-100, 100]
+    wrist_roll:    [-150, 150]
+    gripper:       [0, 100]
+  slow_speed_deg_s: 45          # every move except the throw itself (go to wind-up, return to rest)
+  max_throw_speed_deg_s: 500    # refuse throws whose commanded joint speed is higher than this
+  min_throw_time_s: 0.10        # refuse throws faster than this
+  max_temperature_c: 55         # refuse to throw if any servo is hotter (STS3215 weakens when hot)
+  confirm_each_throw: true      # ask for Enter before every live throw (disable with --yes)
+
+control:
+  rate_hz: 200                  # control loop rate during the throw
+
+# Pose the arm folds into when idle and at exit. Torque is switched off here at exit, so it must be
+# a pose where the arm rests on itself / its stops without falling. TUNE (record it).
+rest:
+  shoulder_pan: 0
+  shoulder_lift: -95
+  elbow_flex: 95
+  wrist_flex: 60
+  wrist_roll: 0
+  gripper: 5
+
+# Settings shared by all cups. Any of these can be overridden per cup below,
+# or for one run on the command line:  --set throw_time_s=0.2  --set windup.elbow_flex=70
+throw_defaults:
+  release_mode: gripper       # gripper = open the gripper at the release angle
+                              # none    = no gripper action (scoop/cup style end effector)
+  gripper_closed: 8           # TUNE for the new gripper: holds the ball without squeezing hard
+  gripper_open: 70            # TUNE: wide enough that the ball leaves cleanly
+  release_joint: shoulder_lift  # the joint whose angle triggers the release
+  release_angle: 0            # TUNE (main knob): gripper opens when release_joint passes this angle
+  release_lead_s: 0.03        # TUNE: opens this much earlier to cover the gripper's opening time
+  throw_time_s: 0.30          # TUNE (main knob): time from wind-up to follow-through. Smaller = harder
+  profile: linear             # linear | ease_in (ease_in accelerates through the throw)
+  settle_s: 0.5               # hold the follow-through this long before returning
+  # Wind-up pose (ball loaded here) and follow-through pose (where the throw ends).
+  # shoulder_pan is set by the cup's `pan`, so leave it out of these two.
+  windup:                     # TUNE: record with the pose command
+    shoulder_lift: -40
+    elbow_flex: 60
+    wrist_flex: 40
+    wrist_roll: 0
+  follow_through:             # TUNE: record with the pose command
+    shoulder_lift: 30
+    elbow_flex: -10
+    wrist_flex: -20
+    wrist_roll: 0
+
+# One preset per cup. Start with only `pan` set, then override the knobs you tune.
+# Front cup is 45 cm from the base. The back two sit behind it in a triangle.
+cups:
+  front:
+    pan: 0                    # TUNE: aim straight at the front cup
+  back_left:
+    pan: 5                    # TUNE: a few degrees to one side (sign depends on your calibration)
+    throw_time_s: 0.27        # a bit harder than front, as a starting guess
+  back_right:
+    pan: -5                   # TUNE
+    throw_time_s: 0.27
+
+log_file: throws.csv
